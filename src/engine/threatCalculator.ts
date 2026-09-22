@@ -23,13 +23,23 @@ export function calculateThreatAnalysis(payload: ScanPayload): ScanResult {
   const darkPatternRes = scanDarkPatterns(text);
 
   // 2. Composite Threat Index Formula:
-  // Threat Index = min(100, (FinancialRisk * 0.45) + (DomainRisk * 0.30) + (DarkPatternRisk * 0.25))
+  // Threat Index = (FinancialRisk * 0.45) + (DomainRisk * 0.30) + (DarkPatternRisk * 0.25)
   const rawComposite =
     (paymentRes.financialRisk * 0.45) +
     (domainRes.domainRisk * 0.30) +
     (darkPatternRes.darkPatternRisk * 0.25);
 
-  const threatIndex = Math.min(100, Math.max(0, Math.round(rawComposite)));
+  let threatIndex = Math.round(rawComposite);
+
+  // Calibrate against artificial binary collapse: avoid dead 0% or hard 100%
+  if (text.trim().length > 0) {
+    if (threatIndex <= 3) {
+      threatIndex = 4; // Baseline inbound message audit exposure
+    } else if (threatIndex >= 96) {
+      threatIndex = 94; // Severe threat ceiling
+    }
+  }
+  threatIndex = Math.min(98, Math.max(0, threatIndex));
 
   // 3. Verdict Categorization
   let verdict: ThreatVerdict;
